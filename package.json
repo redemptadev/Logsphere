@@ -1,0 +1,32 @@
+{
+  "name": "logsphere",
+  "version": "1.0.0",
+  "description": "Server Log Management System for Nairobi Tech Hub",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "node backend/index.js",
+    "dev": "nodemon backend/index.js",
+    "create-admin": "node backend/createAdmin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.4",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "multer": "^2.5.0",
+    "nodemailer": "^10.5.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
