@@ -34,9 +34,72 @@ function logDeliveryFailure(error, info) {
   return responseCode;
 }
 
+function getBrevoSender(from) {
+  const formatted = String(from).trim().match(/^(.*?)\s*<([^<>]+)>$/);
+  if (!formatted) return { email: String(from).trim() };
+
+  const name = formatted[1].trim().replace(/^["']|["']$/g, '');
+  return name
+    ? { name, email: formatted[2].trim() }
+    : { email: formatted[2].trim() };
+}
+
+function safeErrorCode(error) {
+  const code = error.name === 'AbortError' ? 'ETIMEDOUT' : error.code || error.name || 'UNKNOWN';
+  return /^[a-z0-9_-]{1,40}$/i.test(code) ? code : 'UNKNOWN';
+}
+
+async function sendWithBrevoApi({ recipient, subject, text }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'api-key': config.mail.brevoApiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: getBrevoSender(config.mail.from),
+        to: [{ email: recipient }],
+        subject,
+        textContent: text,
+      }),
+      signal: controller.signal,
+    });
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      result = null;
+    }
+
+    if (response.status !== 201 || !result?.messageId) {
+      console.error('[email] Brevo API delivery failed', { status: response.status });
+      throw new EmailDeliveryError('Brevo did not accept the email. Check the API key and verified sender.');
+    }
+
+    return {
+      accepted: [recipient],
+      rejected: [],
+      messageId: result.messageId,
+      responseCode: response.status,
+    };
+  } catch (error) {
+    if (error instanceof EmailDeliveryError) throw error;
+    console.error('[email] Brevo API request failed', { code: safeErrorCode(error) });
+    throw new EmailDeliveryError('The Brevo API could not be reached. Try again later.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function sendMail({ to, subject, text }) {
-  if (!config.mail.host || !Number.isInteger(config.mail.port) || config.mail.port < 1 || config.mail.port > 65535
-    || !config.mail.user || !config.mail.pass || !config.mail.from) {
+  const smtpConfigured = config.mail.host && Number.isInteger(config.mail.port)
+    && config.mail.port >= 1 && config.mail.port <= 65535 && config.mail.user && config.mail.pass;
+  if (!config.mail.from || (!config.mail.brevoApiKey && !smtpConfigured)) {
     const error = new Error('Email delivery is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and MAIL_FROM.');
     error.name = 'EmailConfigurationError';
     error.status = 503;
@@ -48,6 +111,10 @@ async function sendMail({ to, subject, text }) {
     const error = new Error('A recipient email address is required.');
     error.status = 400;
     throw error;
+  }
+
+  if (config.mail.brevoApiKey) {
+    return sendWithBrevoApi({ recipient, subject, text });
   }
 
   const secure = config.mail.port === 465;
