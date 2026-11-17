@@ -115,15 +115,19 @@ router.post('/login', sensitiveLimit, async (req, res, next) => {
     const identifier = String(req.body.identifier || '').trim();
     const password = String(req.body.password || '');
     if (!identifier || !password) return res.status(400).json({ error: 'Enter your email or username and password.' });
-    if (Buffer.byteLength(password, 'utf8') > 72) return res.status(401).json({ error: 'Invalid email/username or password.' });
+    if (Buffer.byteLength(password, 'utf8') > 72) {
+      console.warn('Login rejected: reason=password_too_long');
+      return res.status(401).json({ error: 'Invalid email/username or password.' });
+    }
     const result = await query(
       `SELECT id, full_name, email, username, role, password_hash, account_status, is_active, is_verified
-       FROM users WHERE email = $1 OR lower(username) = lower($1) LIMIT 1`,
+       FROM users WHERE lower(email) = $1 OR lower(username) = $1 LIMIT 1`,
       [identifier.toLowerCase()],
     );
     const user = result.rows[0];
     const valid = user && await bcrypt.compare(password, user.password_hash);
     if (!valid) {
+      console.warn(`Login rejected: reason=${user ? 'password_mismatch' : 'user_not_found'}`);
       await audit(user?.id, 'failed_login', 'Failed sign-in attempt.', user?.id ? String(user.id) : null, req.ip);
       return res.status(401).json({ error: 'Invalid email/username or password.' });
     }
