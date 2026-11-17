@@ -52,8 +52,7 @@ async function start() {
   if (!config.adminEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.adminEmail)) {
     throw new Error('ADMIN_EMAIL must be configured with a valid administrator email address.');
   }
-  const schemaPath = path.resolve(__dirname, '../database/schema.sql');
-  await pool.query(fs.readFileSync(schemaPath, 'utf8'));
+  
   app.listen(config.port, () => console.log(`LogSphere API listening on http://localhost:${config.port}`));
 }
 
