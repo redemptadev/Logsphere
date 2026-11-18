@@ -10,6 +10,7 @@ export default function ReportsPage() {
   const [data, setData] = useState(null)
   const [dates, setDates] = useState({ from: dateMonthAgo, to: dateToday })
   const [error, setError] = useState('')
+  const [downloadError, setDownloadError] = useState('')
   const [busy, setBusy] = useState(false)
   const [refresh, setRefresh] = useState(0)
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function ReportsPage() {
   }, [dates, refresh])
 
   async function exportCsv() {
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setDownloadError('')
     try {
       const params = {}
       if (dates.from) params.from = new Date(dates.from).toISOString()
@@ -33,7 +34,7 @@ export default function ReportsPage() {
       const link = document.createElement('a')
       link.href = url; link.download = 'logsphere-report.csv'; link.click()
       URL.revokeObjectURL(url)
-    } catch (requestError) { setError(getErrorMessage(requestError)) }
+    } catch (requestError) { setDownloadError(getErrorMessage(requestError)) }
     finally { setBusy(false) }
   }
 
@@ -48,9 +49,9 @@ export default function ReportsPage() {
   return (
     <>
       <div className="page-heading reports-heading"><div><h1>Reports</h1><p>Analyse logs and generate reports</p></div>
-        <div className="heading-actions"><label className="date-filter">From<input type="date" value={dates.from} onChange={(e) => setDates({ ...dates, from: e.target.value })} /></label><label className="date-filter">To<input type="date" value={dates.to} onChange={(e) => setDates({ ...dates, to: e.target.value })} /></label><button className="secondary-button" onClick={() => setRefresh(refresh + 1)}>Generate Report</button><button className="primary-button" onClick={exportCsv} disabled={busy}>{busy ? 'Preparing…' : '⇩ Export Report'}</button></div>
+        <div className="heading-actions"><label className="date-filter">From<input type="date" value={dates.from} onChange={(e) => setDates({ ...dates, from: e.target.value })} /></label><label className="date-filter">To<input type="date" value={dates.to} onChange={(e) => setDates({ ...dates, to: e.target.value })} /></label><button className="secondary-button" onClick={() => { setRefresh(refresh + 1); exportCsv() }} disabled={busy}>{busy ? 'Generating…' : 'Generate Report'}</button><button className="primary-button" onClick={exportCsv} disabled={busy}>{busy ? 'Preparing…' : '⇩ Export Report'}</button></div>
       </div>
-      {error && <div className="inline-error">{error}</div>}
+      {(downloadError || error) && <div className="inline-error">{downloadError || error}</div>}
       <div className="report-total panel"><div><span className="report-total-icon">▤</span><div><span>Total logs in selected period</span><strong>{data ? data.total.toLocaleString() : '—'}</strong></div></div><small>Based on PostgreSQL records</small></div>
       <section className="reports-grid">
         <article className="panel report-panel severity-report"><div className="panel-heading"><div><h2>Log Severity Distribution</h2><p>Breakdown by severity level</p></div></div>
